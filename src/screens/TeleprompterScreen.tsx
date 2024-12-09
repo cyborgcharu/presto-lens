@@ -8,7 +8,6 @@ import {
   StyleSheet,
   SafeAreaView,
   Dimensions,
-  Animated,
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -31,32 +30,40 @@ const TeleprompterScreen = () => {
   const [scrollSpeed, setScrollSpeed] = useState(1);
   const scrollViewRef = useRef(null);
   const scrollY = useRef(0);
+  const animationRef = useRef(null);
 
   const increaseFontSize = () => setFontSize(prev => prev + 2);
   const decreaseFontSize = () => setFontSize(prev => Math.max(16, prev - 2));
 
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying);
-    if (!isPlaying) startScrolling();
+  const scroll = () => {
+    if (!scrollViewRef.current || !isPlaying) return;
+    
+    scrollY.current += scrollSpeed;
+    scrollViewRef.current?.scrollTo({
+      y: scrollY.current,
+      animated: false,
+    });
+    
+    animationRef.current = requestAnimationFrame(scroll);
   };
 
-  const startScrolling = () => {
-    if (!scrollViewRef.current) return;
-    
-    const scroll = () => {
-      if (!isPlaying) return;
-      
-      scrollY.current += scrollSpeed;
-      scrollViewRef.current?.scrollTo({
-        y: scrollY.current,
-        animated: true,
-      });
-      
-      requestAnimationFrame(scroll);
+  useEffect(() => {
+    if (isPlaying) {
+      animationRef.current = requestAnimationFrame(scroll);
+    } else {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
     };
-    
-    requestAnimationFrame(scroll);
-  };
+  }, [isPlaying, scrollSpeed]);
+
+  const togglePlay = () => setIsPlaying(!isPlaying);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -170,11 +177,19 @@ const styles = StyleSheet.create({
   playButton: {
     backgroundColor: '#333',
     padding: 20,
-    borderRadius: 30,
-    width: 60,
-    height: 60,
+    borderRadius: 35,
+    width: 70,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   playButtonText: {
     fontSize: 24,
@@ -184,11 +199,13 @@ const styles = StyleSheet.create({
   },
   speedButton: {
     backgroundColor: '#333',
-    padding: 10,
-    borderRadius: 8,
+    padding: 15,
+    borderRadius: 25,
     marginLeft: 10,
-    width: 50,
+    width: 55,
+    height: 55,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   fontControls: {
     flexDirection: 'row',
