@@ -66,8 +66,15 @@ export const Controls: React.FC<ControlsProps> = ({
 const styles = StyleSheet.create({
   controls: {
     padding: 20,
+<<<<<<< Updated upstream
     paddingBottom: 40,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
+=======
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // More transparent background
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+>>>>>>> Stashed changes
   },
   topControls: {
     flexDirection: 'row',
@@ -76,7 +83,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   playButton: {
+<<<<<<< Updated upstream
     backgroundColor: '#333',
+=======
+    backgroundColor: '#333', // Solid background
+>>>>>>> Stashed changes
     padding: 20,
     borderRadius: 35,
     width: 70,
@@ -99,7 +110,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   speedButton: {
+<<<<<<< Updated upstream
     backgroundColor: '#333',
+=======
+    backgroundColor: '#333', // Solid background
+>>>>>>> Stashed changes
     padding: 15,
     borderRadius: 25,
     marginLeft: 10,
@@ -113,7 +128,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   button: {
+<<<<<<< Updated upstream
     backgroundColor: '#333',
+=======
+    backgroundColor: '#333', // Solid background
+>>>>>>> Stashed changes
     padding: 20,
     borderRadius: 12,
     marginHorizontal: 20,
@@ -125,4 +144,24 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '600',
   },
+<<<<<<< Updated upstream
 });
+=======
+  speedIndicator: {
+    position: 'absolute',
+    right: 28,
+    bottom: Platform.OS === 'ios' ? 140 : 110,
+    backgroundColor: '#333', // Solid background
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  speedText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+});
+
+export default Controls;
+>>>>>>> Stashed changes
