@@ -1,21 +1,28 @@
 // src/components/prompter/ScriptView.tsx
-import React from 'react';
-import { ScrollView, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useMemo } from 'react';
+import { 
+  ScrollView, 
+  Text, 
+  StyleSheet, 
+  Dimensions, 
+  ViewStyle,
+  TextStyle,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  View,
+  Platform
+} from 'react-native';
 
 interface ScriptViewProps {
   content: string[];
   fontSize: number;
   scrollViewRef: React.RefObject<ScrollView>;
-<<<<<<< Updated upstream
-  onScroll: (event: any) => void;
-=======
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   textColor?: string;
   backgroundColor?: string;
   lineHeight?: number;
   fontFamily?: string;
   mirror?: boolean;
->>>>>>> Stashed changes
 }
 
 export const ScriptView: React.FC<ScriptViewProps> = ({
@@ -23,40 +30,14 @@ export const ScriptView: React.FC<ScriptViewProps> = ({
   fontSize,
   scrollViewRef,
   onScroll,
-<<<<<<< Updated upstream
-=======
   textColor = '#ffffff',
   backgroundColor = '#000000',
   lineHeight = 1.5,
   fontFamily = Platform.OS === 'ios' ? 'System' : 'sans-serif',
   mirror = false,
->>>>>>> Stashed changes
 }) => {
-  const { width } = Dimensions.get('window');
+  const { width, height } = Dimensions.get('window');
   
-<<<<<<< Updated upstream
-  return (
-    <ScrollView 
-      ref={scrollViewRef}
-      style={styles.scrollView}
-      contentContainerStyle={[styles.scrollContent, { padding: width * 0.1 }]}
-      scrollEventThrottle={16}
-      onScroll={onScroll}
-    >
-      {content.map((paragraph, index) => (
-        <Text 
-          key={index} 
-          style={[
-            styles.text, 
-            { fontSize },
-            index > 0 && styles.paragraph
-          ]}
-        >
-          {paragraph}
-        </Text>
-      ))}
-    </ScrollView>
-=======
   const verticalPadding = height * 0.5;
   const horizontalPadding = width * 0.15;
   
@@ -80,7 +61,6 @@ export const ScriptView: React.FC<ScriptViewProps> = ({
     } as ViewStyle,
   }), [backgroundColor, textColor, fontSize, lineHeight, fontFamily, mirror, width, height]);
 
-  // Centered reading guide
   const ReadingGuide = () => (
     <View style={styles.readingGuideContainer}>
       <View style={[styles.readingGuideLine, { backgroundColor: textColor }]} />
@@ -118,28 +98,31 @@ export const ScriptView: React.FC<ScriptViewProps> = ({
       </ScrollView>
       <ReadingGuide />
     </View>
->>>>>>> Stashed changes
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    position: 'relative',
+  },
   scrollView: {
     flex: 1,
   },
-  scrollContent: {
-    paddingTop: 100,
-  },
-  text: {
-    color: '#fff',
-    lineHeight: 50,
-    textAlign: 'center',
-  },
   paragraph: {
-    marginTop: 40,
+    textAlign: 'center',
+    marginVertical: 12,
   },
-<<<<<<< Updated upstream
-});
-=======
+  readingGuideContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
   readingGuideLine: {
     width: '100%',
     height: 2,
@@ -148,4 +131,3 @@ const styles = StyleSheet.create({
 });
 
 export default ScriptView;
->>>>>>> Stashed changes
