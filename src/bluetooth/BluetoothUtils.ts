@@ -1,5 +1,5 @@
 // src/bluetooth/BluetoothUtils.ts
-import { Platform, NativeEventEmitter } from 'react-native';
+import { Platform } from 'react-native';
 import { request, check, PERMISSIONS, RESULTS, PermissionStatus } from 'react-native-permissions';
 import { BleError, BleManager, Device, State } from 'react-native-ble-plx';
 
@@ -17,7 +17,6 @@ interface BluetoothState {
 class BluetoothUtils {
   private static instance: BluetoothUtils;
   private bleManager: BleManager;
-  private bleManagerEmitter: NativeEventEmitter;
   private state: BluetoothState = {
     isScanning: false,
     connectedDevices: new Map(),
@@ -37,8 +36,6 @@ class BluetoothUtils {
         }
       },
     });
-    
-    this.bleManagerEmitter = new NativeEventEmitter(this.bleManager);
   }
 
   private async initialize(): Promise<void> {
@@ -66,7 +63,6 @@ class BluetoothUtils {
     try {
       if (Platform.OS === 'ios') {
         const permissions = [
-          PERMISSIONS.IOS.BLUETOOTH_PERIPHERAL,
           PERMISSIONS.IOS.BLUETOOTH
         ];
 
@@ -177,17 +173,12 @@ class BluetoothUtils {
       const device = await this.bleManager.connectToDevice(deviceId);
       await device.discoverAllServicesAndCharacteristics();
       this.state.connectedDevices.set(deviceId, device);
-
-      const disconnectSubscription = this.bleManagerEmitter.addListener(
-        'BleManagerDisconnectPeripheral',
-        ({ peripheral }) => {
-          if (peripheral === deviceId) {
-            this.state.connectedDevices.delete(deviceId);
-            disconnectSubscription.remove();
-          }
-        }
-      );
-
+  
+      // Use the built-in event handler
+      device.onDisconnected(() => {
+        this.state.connectedDevices.delete(deviceId);
+      });
+  
       return device;
     } catch (error) {
       console.error('Connection failed:', error);
@@ -250,7 +241,6 @@ class BluetoothUtils {
     this.state.connectedDevices.forEach((device, id) => {
       this.disconnectDevice(id).catch(console.error);
     });
-    this.bleManagerEmitter.removeAllListeners('BleManagerDisconnectPeripheral');
     this.bleManager.destroy();
   }
 }

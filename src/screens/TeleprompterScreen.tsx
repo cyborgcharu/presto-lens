@@ -6,13 +6,7 @@ import { Device } from 'react-native-ble-plx';
 import { ScriptView } from '../components/prompter/ScriptView';
 import { Controls } from '../components/prompter/Controls';
 import { useScriptScroll } from '../hooks/useScriptScroll';
-
-import {
-  requestBluetoothPermissions,
-  scanForDevices,
-  connectToDevice,
-  disconnectFromDevice,
-} from '../bluetooth/BluetoothUtils';
+import BluetoothUtils from '../bluetooth/BluetoothUtils';
 
 const SAMPLE_TEXT = [
   'Welcome to PrestoLens!',
@@ -37,7 +31,8 @@ const TeleprompterScreen: React.FC = () => {
   useEffect(() => {
     const requestPermissions = async () => {
       try {
-        await requestBluetoothPermissions();
+        const bluetoothUtils = await BluetoothUtils;
+        await bluetoothUtils.requestPermissions();
         await scanForBluetoothDevices();
       } catch (error) {
         console.error('Error requesting Bluetooth permissions:', error);
@@ -48,32 +43,36 @@ const TeleprompterScreen: React.FC = () => {
 
   const scanForBluetoothDevices = async () => {
     try {
-      const devices = await scanForDevices();
+      const bluetoothUtils = await BluetoothUtils;
+      const devices = await bluetoothUtils.scanForDevices();
       setBluetoothDevices(devices);
     } catch (error) {
       console.error('Error scanning for Bluetooth devices:', error);
     }
   };
 
-  const connectToBluetoothDevice = async (device: Device) => {
+  const handleConnectDevice = async (device: Device) => {
     try {
-      const connectedDevice = await connectToDevice(device.id);
-      setConnectedDevice(connectedDevice);
+      const bluetoothUtils = await BluetoothUtils;
+      const connected = await bluetoothUtils.connectToDevice(device.id);
+      setConnectedDevice(connected);
     } catch (error) {
       console.error('Error connecting to Bluetooth device:', error);
     }
   };
 
-  const disconnectFromBluetoothDevice = async () => {
+  const handleDisconnectDevice = async () => {
     try {
       if (connectedDevice) {
-        await disconnectFromDevice(connectedDevice);
+        const bluetoothUtils = await BluetoothUtils;
+        await bluetoothUtils.disconnectDevice(connectedDevice.id);
         setConnectedDevice(null);
       }
     } catch (error) {
       console.error('Error disconnecting from Bluetooth device:', error);
     }
   };
+
 
   const handleSpeedChange = (change: number) => {
     setScrollSpeed(prev => Math.max(0.5, Math.min(3, prev + change)));
