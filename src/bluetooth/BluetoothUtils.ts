@@ -1,114 +1,258 @@
-// src/bluetooth/bluetoothUtils.ts
-import { Platform, NativeEventEmitter, NativeModule } from 'react-native';
-import { request, PERMISSIONS } from 'react-native-permissions';
-import { BleError, BleManager, Device } from 'react-native-ble-plx';
+// src/bluetooth/BluetoothUtils.ts
+import { Platform, NativeEventEmitter } from 'react-native';
+import { request, check, PERMISSIONS, RESULTS, PermissionStatus } from 'react-native-permissions';
+import { BleError, BleManager, Device, State } from 'react-native-ble-plx';
 
-// Create BleManager instance safely
-let bleManager: BleManager | null = null;
-try {
-  if (Platform.OS === 'ios' || Platform.OS === 'android') {
-    bleManager = new BleManager();
-  }
-} catch (error) {
-  console.warn('Failed to initialize BleManager:', error);
+interface ScanOptions {
+  timeoutMs?: number;
+  serviceUUIDs?: string[] | null;
+  onDeviceFound?: (device: Device) => void;
 }
 
-// Request Bluetooth permissions
-export async function requestBluetoothPermissions() {
-  if (!bleManager) {
-    console.warn('Bluetooth not initialized');
-    return;
-  }
+interface BluetoothState {
+  isScanning: boolean;
+  connectedDevices: Map<string, Device>;
+}
 
-  try {
-    if (Platform.OS === 'android') {
-      await request(PERMISSIONS.ANDROID.BLUETOOTH_CONNECT);
-    } else if (Platform.OS === 'ios') {
-      await request(PERMISSIONS.IOS.BLUETOOTH);
+class BluetoothUtils {
+  private static instance: BluetoothUtils;
+  private bleManager: BleManager;
+  private bleManagerEmitter: NativeEventEmitter;
+  private state: BluetoothState = {
+    isScanning: false,
+    connectedDevices: new Map(),
+  };
+
+  private constructor() {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+      throw new Error('Unsupported platform');
     }
-  } catch (error) {
-    console.error('Failed to request Bluetooth permissions:', error);
-    throw new Error('Failed to request Bluetooth permissions');
+    this.bleManager = new BleManager({
+      restoreStateIdentifier: 'prestolens-bluetooth',
+      restoreStateFunction: (bleRestoredState) => {
+        if (bleRestoredState == null) {
+          console.log('No bluetooth state to restore');
+        } else {
+          console.log('Restored bluetooth state:', bleRestoredState);
+        }
+      },
+    });
+    
+    this.bleManagerEmitter = new NativeEventEmitter(this.bleManager);
   }
-}
 
-// Scan for available Bluetooth devices
-export function scanForDevices(): Promise<Device[]> {
-  if (!bleManager) {
-    console.warn('Bluetooth not initialized');
-    return Promise.resolve([]);
+  private async initialize(): Promise<void> {
+    try {
+      const state = await this.bleManager.state();
+      if (state === State.PoweredOff) {
+        throw new Error('Bluetooth is powered off');
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.error('Failed to initialize BLE:', error);
+      throw error;
+    }
   }
 
-  return new Promise<Device[]>((resolve, reject) => {
-    let devices: Device[] = [];
-    let isScanning = false;
+  static async getInstance(): Promise<BluetoothUtils> {
+    if (!BluetoothUtils.instance) {
+      BluetoothUtils.instance = new BluetoothUtils();
+      await BluetoothUtils.instance.initialize();
+    }
+    return BluetoothUtils.instance;
+  }
 
-    const handleScannerState = (error: BleError | null, scannedDevice: Device | null) => {
-      if (error) {
-        reject(error);
-      } else if (scannedDevice) {
-        devices.push(scannedDevice);
-      } else {
-        isScanning = false;
+  async requestPermissions(): Promise<boolean> {
+    try {
+      if (Platform.OS === 'ios') {
+        const permissions = [
+          PERMISSIONS.IOS.BLUETOOTH_PERIPHERAL,
+          PERMISSIONS.IOS.BLUETOOTH
+        ];
+
+        const results = await Promise.all(
+          permissions.map(permission => check(permission))
+        );
+
+        if (results.some(result => result === RESULTS.DENIED)) {
+          const requestResults = await Promise.all(
+            permissions.map(permission => request(permission))
+          );
+          return requestResults.every(result => result === RESULTS.GRANTED);
+        }
+
+        return results.every(result => result === RESULTS.GRANTED);
+      }
+
+      if (Platform.OS === 'android') {
+        const permissions = [
+          PERMISSIONS.ANDROID.BLUETOOTH_SCAN,
+          PERMISSIONS.ANDROID.BLUETOOTH_CONNECT,
+          PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
+        ];
+
+        const results = await Promise.all(
+          permissions.map(permission => check(permission))
+        );
+
+        if (results.some(result => result === RESULTS.DENIED)) {
+          const requestResults = await Promise.all(
+            permissions.map(permission => request(permission))
+          );
+          return requestResults.every(result => result === RESULTS.GRANTED);
+        }
+
+        return results.every(result => result === RESULTS.GRANTED);
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Permission request failed:', error);
+      return false;
+    }
+  }
+
+  async checkBluetoothState(): Promise<State> {
+    return await this.bleManager.state();
+  }
+
+  async scanForDevices(options: ScanOptions = {}): Promise<Device[]> {
+    if (this.state.isScanning) {
+      throw new Error('Already scanning for devices');
+    }
+
+    const {
+      timeoutMs = 10000,
+      serviceUUIDs = null,
+      onDeviceFound,
+    } = options;
+
+    return new Promise<Device[]>((resolve, reject) => {
+      const devices: Device[] = [];
+      let timeoutId: NodeJS.Timeout;
+
+      const handleScan = (error: BleError | null, device: Device | null) => {
+        if (error) {
+          this.stopScan();
+          reject(error);
+          return;
+        }
+
+        if (device && !devices.find(d => d.id === device.id)) {
+          devices.push(device);
+          onDeviceFound?.(device);
+        }
+      };
+
+      const stopScanAndResolve = () => {
+        this.stopScan();
         resolve(devices);
+      };
+
+      try {
+        this.state.isScanning = true;
+        this.bleManager.startDeviceScan(serviceUUIDs, null, handleScan);
+        timeoutId = setTimeout(stopScanAndResolve, timeoutMs);
+      } catch (error) {
+        this.state.isScanning = false;
+        reject(error);
       }
-    };
 
-    const startScan = () => {
-      isScanning = true;
-      bleManager!.startDeviceScan(null, null, handleScannerState);
-    };
-
-    const stopScan = () => {
-      if (isScanning && bleManager) {
-        bleManager.stopDeviceScan();
-      }
-    };
-
-    startScan();
-
-    // Stop scanning after 10 seconds
-    const scanTimeoutId = setTimeout(stopScan, 10000);
-
-    return () => {
-      clearTimeout(scanTimeoutId);
-      stopScan();
-    };
-  });
-}
-
-// Connect to a Bluetooth device
-export async function connectToDevice(deviceId: string): Promise<Device> {
-  if (!bleManager) {
-    throw new Error('Bluetooth not initialized');
+      return () => {
+        clearTimeout(timeoutId);
+        this.stopScan();
+      };
+    });
   }
 
-  try {
-    const device = await bleManager.connectToDevice(deviceId);
-    await device.discoverAllServicesAndCharacteristics();
-    return device;
-  } catch (error) {
-    console.error('Failed to connect to Bluetooth device:', error);
-    throw new Error('Failed to connect to Bluetooth device');
+  private stopScan(): void {
+    if (this.state.isScanning) {
+      this.bleManager.stopDeviceScan();
+      this.state.isScanning = false;
+    }
+  }
+
+  async connectToDevice(deviceId: string): Promise<Device> {
+    try {
+      const device = await this.bleManager.connectToDevice(deviceId);
+      await device.discoverAllServicesAndCharacteristics();
+      this.state.connectedDevices.set(deviceId, device);
+
+      const disconnectSubscription = this.bleManagerEmitter.addListener(
+        'BleManagerDisconnectPeripheral',
+        ({ peripheral }) => {
+          if (peripheral === deviceId) {
+            this.state.connectedDevices.delete(deviceId);
+            disconnectSubscription.remove();
+          }
+        }
+      );
+
+      return device;
+    } catch (error) {
+      console.error('Connection failed:', error);
+      throw error;
+    }
+  }
+
+  async disconnectDevice(deviceId: string): Promise<void> {
+    const device = this.state.connectedDevices.get(deviceId);
+    if (!device) {
+      throw new Error('Device not connected');
+    }
+
+    try {
+      await this.bleManager.cancelDeviceConnection(deviceId);
+      this.state.connectedDevices.delete(deviceId);
+    } catch (error) {
+      console.error('Disconnection failed:', error);
+      throw error;
+    }
+  }
+
+  async writeToDevice(
+    deviceId: string,
+    serviceUUID: string,
+    characteristicUUID: string,
+    data: string
+  ): Promise<void> {
+    const device = this.state.connectedDevices.get(deviceId);
+    if (!device) {
+      throw new Error('Device not connected');
+    }
+
+    try {
+      await device.writeCharacteristicWithResponseForService(
+        serviceUUID,
+        characteristicUUID,
+        Buffer.from(data).toString('base64')
+      );
+    } catch (error) {
+      console.error('Write failed:', error);
+      throw error;
+    }
+  }
+
+  getConnectedDevices(): Device[] {
+    return Array.from(this.state.connectedDevices.values());
+  }
+
+  isDeviceConnected(deviceId: string): boolean {
+    return this.state.connectedDevices.has(deviceId);
+  }
+
+  isScanning(): boolean {
+    return this.state.isScanning;
+  }
+
+  dispose(): void {
+    this.stopScan();
+    this.state.connectedDevices.forEach((device, id) => {
+      this.disconnectDevice(id).catch(console.error);
+    });
+    this.bleManagerEmitter.removeAllListeners('BleManagerDisconnectPeripheral');
+    this.bleManager.destroy();
   }
 }
 
-// Disconnect from a Bluetooth device
-export async function disconnectFromDevice(device: Device) {
-  if (!bleManager) {
-    console.warn('Bluetooth not initialized');
-    return;
-  }
-
-  try {
-    await bleManager.cancelDeviceConnection(device.id);
-  } catch (error) {
-    console.error('Failed to disconnect from Bluetooth device:', error);
-    throw new Error('Failed to disconnect from Bluetooth device');
-  }
-}
-
-// Export for checking if Bluetooth is available
-export function isBluetoothAvailable(): boolean {
-  return bleManager !== null;
-}
+export default BluetoothUtils.getInstance();
