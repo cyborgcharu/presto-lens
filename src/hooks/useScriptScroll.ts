@@ -1,5 +1,6 @@
 // src/hooks/useScriptScroll.ts
 import { useRef, useEffect } from 'react';
+import { ScrollView } from 'react-native';
 
 export const useScriptScroll = (isPlaying: boolean, scrollSpeed: number) => {
   const scrollY = useRef(0);

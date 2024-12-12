@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Device } from 'react-native-ble-plx';
 import RNShake from 'react-native-shake';
-import BluetoothUtils from '../bluetooth/bluetoothUtils';
+import BluetoothUtils from '../bluetooth/BluetoothUtils';
 
 // Update the interface to match Device's properties exactly
 type GlassesDevice = Device & {
